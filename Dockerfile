@@ -6,8 +6,6 @@ COPY requirements.txt requirements.txt
 
 RUN pip install -r requirements.txt
 
-ENV secretpassword=hahaha
-
 WORKDIR /con-trans-2025
 
 EXPOSE 8888
