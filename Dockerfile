@@ -8,6 +8,8 @@ RUN pip install -r requirements.txt
 
 WORKDIR /con-trans-2025
 
-EXPOSE 8888
+#EXPOSE 8888
+EXPOSE 8050
 
-CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--allow-root"]
+#CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--allow-root"]
+CMD ["python", "app/app.py"]
