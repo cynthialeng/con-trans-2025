@@ -57,7 +57,7 @@ app.layout = html.Div(
                          [this website](https://www.congress.gov/members/find-your-member).'''),
             dcc.Dropdown(id = 'dropdown', options=dropdown_options, value='N000188') # Step 1: user input  
         ],
-                 style={'width':'25%', 'float':'left'}),
+                 style={'width':'24%', 'float':'left'}),
 
         html.Div([
             dcc.Tabs([
@@ -71,12 +71,17 @@ app.layout = html.Div(
                             dcc.Graph(id = 'vote_scatter')
                         ]),
                 dcc.Tab(label = 'Sponsored Bills',
-                        children = []),
+                        children = [
+                            dcc.Markdown("**The following keywords and phrases describe this legislator's work in Congress:**"),
+                            dcc.Graph(id = 'tfidf_bar'),
+                            dcc.Markdown('**This legislator has sponsored the following bills:**'),
+                            dcc.Graph(id = 'bills_table')
+                        ]),
                 dcc.Tab(label = 'Who is Giving Them Money?',
                         children = [])
             ])
         ],
-                 style={'width':'75%', 'float':'right'})
+                 style={'width':'74%', 'float':'right'})
     ]
 )
 
@@ -87,9 +92,9 @@ app.layout = html.Div(
 
 def biotable(b): # Step 3: write a function that turns input into output
     myquery = f'''
-    SELECT *
-    FROM members
-    WHERE bioguide_id = '{b}'
+        SELECT *
+        FROM members
+        WHERE bioguide_id = '{b}'
     '''
     member_info = pd.read_sql(myquery, con=engine)
     member_info = member_info.drop(['bioguide_id', 'image', 'fec_id', 'bioname', 'icpsr'], axis=1)
@@ -100,9 +105,9 @@ def biotable(b): # Step 3: write a function that turns input into output
 
 def bioimage(b):
     myquery = f'''
-    SELECT image
-    FROM members
-    WHERE bioguide_id = '{b}'
+        SELECT image
+        FROM members
+        WHERE bioguide_id = '{b}'
     '''
     image_url = pd.read_sql(myquery, con=engine)['image'][0]
     return [image_url]
@@ -112,20 +117,20 @@ def bioimage(b):
 
 def vote_scatterplot(b):
     myquery = f'''
-    SELECT c.comparison_member, 
-           c.agree, 
-           m.left_right_ideology,
-           m.party
-    FROM members m
-    INNER JOIN (
-        SELECT vc.comparison_member,
-            vc.agree
+        SELECT c.comparison_member, 
+            c.agree, 
+            m.left_right_ideology,
+            m.party
         FROM members m
-        INNER JOIN vote_compare vc
-            ON m.bioname = vc.bioname
-        WHERE m.bioguide_id = '{b}'
-    ) c
-        ON m.bioname = c.comparison_member
+        INNER JOIN (
+            SELECT vc.comparison_member,
+                vc.agree
+            FROM members m
+            INNER JOIN vote_compare vc
+                ON m.bioname = vc.bioname
+            WHERE m.bioguide_id = '{b}'
+        ) c
+            ON m.bioname = c.comparison_member
     '''
     vote_data = pd.read_sql(myquery, con=engine)
     fig = px.scatter(vote_data,
@@ -135,6 +140,37 @@ def vote_scatterplot(b):
                  color = 'party',
                  color_discrete_map={'Democrat':'blue', 'Republican':'red'})
     return [fig]
+
+
+@app.callback([Output(component_id = 'bills_table', component_property = 'figure')],
+              [Input(component_id = 'dropdown', component_property = 'value')])
+
+def billstable(b):
+    myquery = f'''
+        Select bill_title, introducedDate, url
+        From bills
+        Where bioguide_id = '{b}' and bill_title != 'None'
+    '''
+    bills = pd.read_sql(myquery, con=engine)
+    return [ff.create_table(bills)]
+
+
+@app.callback([Output(component_id = 'tfidf_bar', component_property = 'figure')],
+              [Input(component_id = 'dropdown', component_property = 'value')])
+
+def tfidf_bar(b):
+    myquery = f'''
+        Select *
+        From tfidf
+        Where bioguide_id = '{b}'
+        ORDER BY tf_idf
+    '''
+    tfidf_data = pd.read_sql_query(myquery, con=engine)
+
+    fig = px.bar(tfidf_data, y='keyword', x='tf_idf', color='tf_idf')
+    fig.update_layout(yaxis_title='Keywords or Phrases', xaxis_title='TF-IDF')
+    return [fig]
+
 
 # Run the dashboard
 if __name__ == '__main__':
